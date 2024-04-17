@@ -1,9 +1,10 @@
 # EffNet_Template
 CNN Template
-git clone https://github.com/Tw1sst3d/EffNet_Template.git
 
-cd EffNet_Template
+``` git clone https://github.com/Tw1sst3d/EffNet_Template.git
 
-"conda env create -f environment.yml" in die Kommandozeile um das Enviroment aufzubauen.
+``` cd EffNet_Template
 
-"conda activate CNN_T"
+``` conda env create -f environment.yml
+
+``` conda activate CNN_T
