@@ -20,9 +20,13 @@ from sklearn.preprocessing import LabelEncoder
 # indem Berechnungen in geringerer Präzision durchgeführt werden, ohne signifikant die Modellleistung zu beeinträchtigen.
 set_global_policy("mixed_float16")
 
-# Modellname für die Benennung der gespeicherten Dateien
-modelname = "Testmodell"
- 
+# Relevante Konfigurationen für das Training
+modelname = "Testmodell" # Name des Modells, der für die Benennung der gespeicherten Dateien verwendet wird
+imagesize = (400, 290)  # Größe der Bilder, die für das Modell verwendet werden. 
+input_shape = (400, 290, 3) # Eingangsgröße des Modells
+test_size = 0.03  # Anteil der Daten, der für die Validierung verwendet wird
+metadataspalte = "dx"  # Spalte in den Metadaten, die die Diagnose (Label) enthält
+
 # Pfad zum aktuellen Verzeichnis und zu den Bildverzeichnissen
 base_dir = os.getcwd() # Ermitteln des aktuellen Arbeitsverzeichnispfads
 
@@ -31,7 +35,7 @@ base_dir = os.getcwd() # Ermitteln des aktuellen Arbeitsverzeichnispfads
 images_dir_part1 = os.path.join(base_dir, "HAM10000_images_part_1")
 images_dir_part2 = os.path.join(base_dir, "HAM10000_images_part_2")
 
- 
+
 # Metadaten aus .csv einlesen und Bildpfade hinzufügen (Label zu Bildern)
 # Zuerst werden die Metadaten aus der CSV-Datei geladen. Diese Metadaten enthalten wichtige Informationen wie Bild-IDs und entsprechende Labels.
 metadata = pd.read_csv(os.path.join(base_dir, "HAM10000_metadata.csv"))
@@ -50,7 +54,6 @@ def get_image_path(image_id):
 metadata["path"] = metadata["image_id"].apply(get_image_path)
 
 
- 
 # Label-Encoding für die Klassifikationslabels
 # Der LabelEncoder konvertiert die textuellen Labels (Läsionstypen) in numerische Werte.
 # Dies ist ein notwendiger Schritt, da maschinelle Lernmodelle mit numerischen Werten und nicht mit Textdaten arbeiten.
@@ -59,10 +62,10 @@ label_encoder = LabelEncoder()
 
 # Der fit_transform-Prozess lernt die Zuordnung der einzigartigen Label zu ganzen Zahlen und wendet sie gleichzeitig an,
 # um eine neue Spalte "label_index" zu erstellen, die die numerischen Labels enthält.
-metadata["label_index"] = label_encoder.fit_transform(metadata["dx"])
+metadata["label_index"] = label_encoder.fit_transform(metadata[metadataspalte]) # "dx" ist die Spalte, die die Diagnose enthält
 
 # Die umgewandelten Labels werden für das Training des Modells verwendet.
-labels = metadata["label_index"]
+labels = metadata["label_index"] # Die numerischen Labels werden in einem separaten Array gespeichert.
 
  
 # Daten-Augmentation durch Oversampling zur Adressierung von Klassenungleichgewichten
@@ -71,17 +74,17 @@ labels = metadata["label_index"]
 # Durch das Hinzufügen künstlich erzeugter oder duplizierter Beispiele wird die Wahrscheinlichkeit von Overfitting reduziert.
 # Overfitting tritt auf, wenn ein Modell die Trainingsdaten zu genau lernt und sich dadurch schlechter auf neuen Daten verhält.
 # Hier wird RandomOverSampler aus der imblearn-Bibliothek verwendet, um ein gleichmäßigeres Verhältnis zwischen den Klassen zu erreichen.
-ros = RandomOverSampler()
+ros = RandomOverSampler() # Initialisierung des RandomOverSampler
 
 # "metadata[["path", "label_index"]]" enthält die Pfade und Label-Indizes für das Oversampling.
 # Das Ergebnis sind ein neuer Datensatz "metadata_resampled" und die entsprechenden Labels "labels_resampled",
 # die ein ausgeglicheneres Klassenverhältnis aufweisen.
-metadata_resampled, labels_resampled = ros.fit_resample(metadata[["path", "label_index"]], labels)
+metadata_resampled, labels_resampled = ros.fit_resample(metadata[["path", "label_index"]], labels) # Anwendung des RandomOverSampler
 
 # Die neuen, resampelten Labels werden den Metadaten hinzugefügt, um sie für das Training vorzubereiten.
-metadata_resampled["label_index"] = labels_resampled
+metadata_resampled["label_index"] = labels_resampled # Hinzufügen der resampelten Labels zu den Metadaten
 
- 
+
 # Vorverarbeitung der Bilder für das Modell
 # Diese Funktion liest ein Bild von einem gegebenen Pfad, decodiert es zu einem Tensor, ändert seine Größe auf 224x224 Pixel
 # und wendet dann eine Modell-spezifische Vorverarbeitung (hier für ResNet50) an. Dieser Schritt ist notwendig, um sicherzustellen,
@@ -89,7 +92,7 @@ metadata_resampled["label_index"] = labels_resampled
 def preprocess_image(image_path, label):
     image = tf.io.read_file(image_path)
     image = tf.image.decode_jpeg(image, channels=3)
-    image = tf.image.resize(image, [400, 290])
+    image = tf.image.resize(image, imagesize)
     image = preprocess_input(image)  # ResNet Vorverarbeitung
     return image, label
 
@@ -108,7 +111,7 @@ def load_and_preprocess_from_dataframe(df):
 
 
 # Hier wird der resampelte DataFrame "metadata_resampled" in Trainings- und Validierungsdatensätze aufgeteilt.
-train_df, validation_df = train_test_split(metadata_resampled, test_size=0.03, random_state=42) # Etwa 500 Bilder in den Validierungsdaten, da insgesamt 10000 Bilder
+train_df, validation_df = train_test_split(metadata_resampled, test_size=test_size, random_state=42)
 
 # Die Aufteilung ermöglicht eine unabhängige Bewertung der Modellleistung auf Daten, die während des Trainings nicht gesehen wurden.
 
@@ -135,12 +138,23 @@ ds_validation = ds_validation.batch(64).prefetch(buffer_size=tf.data.AUTOTUNE)
 
 # Definition des Modells, das für die Klassifikation von Hautläsionen eingesetzt wird. 
 # Ein vortrainiertes ResNet50-Modell wird als Basis verwendet, um den Rechenaufwand zu verringern und von bereits gelernten Merkmalen zu profitieren.
-from tensorflow.keras.applications import EfficientNetV2B0
+from tensorflow.keras.applications import EfficientNetV2B0, EfficientNetV2B1, EfficientNetV2B2, EfficientNetB0, EfficientNetB1, EfficientNetB2
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense, Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications.efficientnet_v2 import preprocess_input
-base_model = EfficientNetV2B0(weights='imagenet', include_top=False, input_shape=(400, 290, 3))  # Vortrainiertes Modell lädt Gewichte von ImageNet "imagenet" anstatt None
 
+
+
+# Basis-Modell: 
+
+
+#base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=input_shape)
+# base_model = EfficientNetB1(weights='imagenet', include_top=False, input_shape=input_shape)
+# base_model = EfficientNetB2(weights='imagenet', include_top=False, input_shape=input_shape)
+
+base_model = EfficientNetV2B0(weights='imagenet', include_top=False, input_shape=input_shape)  # Vortrainiertes Modell lädt Gewichte von ImageNet "imagenet" anstatt None
+# base_model = EfficientNetV2B1(weights='imagenet', include_top=False, input_shape=input_shape)  # mittleres Modell
+# base_model = EfficientNetV2B2(weights='imagenet', include_top=False, input_shape=input_shape)  # größeres Modell
 
 
 # Hinzufügen von Schichten zur Anpassung des Modells an das spezifische Problem:
