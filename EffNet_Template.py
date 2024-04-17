@@ -62,7 +62,7 @@ label_encoder = LabelEncoder()
 
 # Der fit_transform-Prozess lernt die Zuordnung der einzigartigen Label zu ganzen Zahlen und wendet sie gleichzeitig an,
 # um eine neue Spalte "label_index" zu erstellen, die die numerischen Labels enthält.
-metadata["label_index"] = label_encoder.fit_transform(metadata[metadataspalte]) # "dx" ist die Spalte, die die Diagnose enthält
+metadata["label_index"] = label_encoder.fit_transform(metadata[metadataspalte]) # Metadaten werden um numerische Labels erweitert
 
 # Die umgewandelten Labels werden für das Training des Modells verwendet.
 labels = metadata["label_index"] # Die numerischen Labels werden in einem separaten Array gespeichert.
