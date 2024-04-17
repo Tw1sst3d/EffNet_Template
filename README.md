@@ -1,5 +1,5 @@
 # EffNet_Template
-CNN Template
+## CNN Template
 
 ``` git clone https://github.com/Tw1sst3d/EffNet_Template.git
 
